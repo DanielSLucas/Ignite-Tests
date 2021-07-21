@@ -20,7 +20,7 @@ describe("Create Statement Use Case", () => {
       inMemoryStatementsRepository
     );
   });
-  it("Should be able to create an deposit statement", async () => {
+  it("Should be able to create a deposit statement", async () => {
     const createdUser = await createUserUseCase.execute({
       name: "John Doe",
       email: "johnDoe@email.com",
@@ -40,7 +40,7 @@ describe("Create Statement Use Case", () => {
     expect(statement).toHaveProperty("type");
   });
 
-  it("Should be able to create an withdraw statement", async () => {
+  it("Should be able to create a withdraw statement", async () => {
     const createdUser = await createUserUseCase.execute({
       name: "John Doe",
       email: "johnDoe@email.com",
@@ -67,7 +67,7 @@ describe("Create Statement Use Case", () => {
     expect(statement).toHaveProperty("type");
   });
 
-  it("Should not be able to create an withdraw statement with invalid balance", async () => {
+  it("Should not be able to create a withdraw statement with invalid balance", async () => {
     const createdUser = await createUserUseCase.execute({
       name: "John Doe",
       email: "johnDoe@email.com",
@@ -89,6 +89,94 @@ describe("Create Statement Use Case", () => {
         type: "withdraw" as OperationType,
       })
     ).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("Should be able to create a transfer statement", async () => {
+    const user1 = await createUserUseCase.execute({
+      name: "John Doe",
+      email: "johnDoe@email.com",
+      password: "john123doe",
+    });
+
+    const user2 = await createUserUseCase.execute({
+      name: "John Doe Second",
+      email: "johnDoe2@email.com",
+      password: "john123doe",
+    });
+
+    await createStatementUseCase.execute({
+      user_id: user1.id as string,
+      amount: 100.00,
+      description: "Achei na rua",
+      type: "deposit" as OperationType,
+    });
+
+    const statement = await createStatementUseCase.execute({
+      user_id: user2.id as string,
+      sender_id: user1.id as string,
+      amount: 50.00,
+      description: "Minha parte no lanchinho no shopping",
+      type: "transfer" as OperationType,
+    });
+
+    expect(statement).toHaveProperty("id");
+    expect(statement).toHaveProperty("amount");
+    expect(statement).toHaveProperty("description");
+    expect(statement).toHaveProperty("type");
+  });
+
+  it("Should not be able to create a transfer statement to an nonexistent user", async () => {
+    const user1 = await createUserUseCase.execute({
+      name: "John Doe",
+      email: "johnDoe@email.com",
+      password: "john123doe",
+    });
+
+    await createStatementUseCase.execute({
+      user_id: user1.id as string,
+      amount: 100.00,
+      description: "Achei na rua",
+      type: "deposit" as OperationType,
+    });
+
+    await expect(
+      createStatementUseCase.execute({
+      user_id: "nonexistent-user-id",
+      sender_id: user1.id as string,
+      amount: 50.00,
+      description: "Minha parte no lanchinho no shopping",
+      type: "transfer" as OperationType,
+    })).rejects.toBeInstanceOf(AppError)
+  });
+
+  it("Should not be able to create a transfer statement with invalid balance", async () => {
+    const user1 = await createUserUseCase.execute({
+      name: "John Doe",
+      email: "johnDoe@email.com",
+      password: "john123doe",
+    });
+
+    const user2 = await createUserUseCase.execute({
+      name: "John Doe Second",
+      email: "johnDoe2@email.com",
+      password: "john123doe",
+    });
+
+    await createStatementUseCase.execute({
+      user_id: user1.id as string,
+      amount: 50.00,
+      description: "Achei na rua",
+      type: "deposit" as OperationType,
+    });
+
+    await expect(
+      createStatementUseCase.execute({
+      user_id: user2.id as string,
+      sender_id: user1.id as string,
+      amount: 100.00,
+      description: "Minha parte no lanchinho no shopping",
+      type: "transfer" as OperationType,
+    })).rejects.toBeInstanceOf(AppError)
   });
 
   it("Should not be able to create a statement for a nonexistent user", async () => {

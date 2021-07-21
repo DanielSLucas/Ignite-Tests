@@ -1,6 +1,7 @@
 import { inject, injectable } from "tsyringe";
 
 import { IUsersRepository } from "../../../users/repositories/IUsersRepository";
+import { OperationType } from "../../entities/Statement";
 import { IStatementsRepository } from "../../repositories/IStatementsRepository";
 import { CreateStatementError } from "./CreateStatementError";
 import { ICreateStatementDTO } from "./ICreateStatementDTO";
@@ -15,12 +16,19 @@ export class CreateStatementUseCase {
     private statementsRepository: IStatementsRepository
   ) {}
 
-  async execute({ user_id, type, amount, description }: ICreateStatementDTO) {
+  async execute({ user_id, type, amount, description, sender_id }: ICreateStatementDTO) {
     const user = await this.usersRepository.findById(user_id);
 
     if(!user) {
       throw new CreateStatementError.UserNotFound();
     }
+
+    let createStatementDTO = {
+      user_id,
+      type,
+      amount,
+      description
+    };
 
     if(type === 'withdraw') {
       const { balance } = await this.statementsRepository.getUserBalance({ user_id });
@@ -30,12 +38,30 @@ export class CreateStatementUseCase {
       }
     }
 
-    const statementOperation = await this.statementsRepository.create({
-      user_id,
-      type,
-      amount,
-      description
-    });
+    if (type === 'transfer' && sender_id) {
+      const sender = await this.usersRepository.findById(sender_id);
+
+      if(!sender) {
+        throw new CreateStatementError.UserNotFound();
+      }
+
+      const { balance } = await this.statementsRepository.getUserBalance({ user_id: sender_id });
+
+      if (balance < amount) {
+        throw new CreateStatementError.InsufficientFunds()
+      }
+
+      await this.statementsRepository.create({
+        user_id: sender_id,
+        type: 'withdraw' as OperationType,
+        amount,
+        description: `Transference to ${user.name}`
+      });
+
+      Object.assign(createStatementDTO, { sender_id, })
+    }
+
+    const statementOperation = await this.statementsRepository.create(createStatementDTO);
 
     return statementOperation;
   }
